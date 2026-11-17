@@ -173,6 +173,7 @@ jobs:
       - name: Build and post checklist comment
         env:
           GH_TOKEN: ${{ github.token }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           SKILL_DIRS: ${{ needs.detect.outputs.skill_dirs }}
           VALIDATE_RESULT: ${{ needs.validate.result }}
           SECRET_RESULT: ${{ needs.secret-scan.result }}
@@ -229,7 +230,12 @@ jobs:
 
           PR="${{ github.event.pull_request.number }}"
           REPO="${{ github.repository }}"
-
+          # A PR from a fork gets a read-only token, so it cannot comment. Show the checklist in the job summary instead.
+          if [ "$HEAD_REPO" != "$REPO" ]; then
+            echo "PR is from a fork ($HEAD_REPO): the token is read-only, so the checklist is in the job summary, not a comment."
+            cat /tmp/checklist.md >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           # Delete previous checklist comment to avoid duplicates on re-push
           OLD=$(gh api "repos/$REPO/issues/$PR/comments" \
             --jq '.[] | select(.user.login == "github-actions[bot]") | select(.body | ltrimstr("\n") | startswith("## EPD Skill Publishing")) | .id' \
